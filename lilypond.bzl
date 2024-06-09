@@ -6,23 +6,11 @@ def _lilypond_impl(ctx):
 
   toolchain = ctx.toolchains["@bazel_lilypond//:lilypond_toolchain_type"]
   args = ctx.actions.args()
-  outs = []
 
-  if ctx.attr.midi_out:
-    outs.append(
-      ctx.actions.declare_file(
-        paths.replace_extension(ctx.file.src.basename, ".midi")
-      )
-    )
   if ctx.attr.png_out:
     args.add("--png")
-    outs.append(
-      ctx.actions.declare_file(
-        paths.replace_extension(ctx.file.src.basename, ".png")
-      )
-    )
 
-  args.add("--output", paths.dirname(outs[0].path))
+  args.add("--output", paths.dirname(ctx.outputs.outs[0].path))
   args.add(ctx.file.src.path)
 
   ctx.actions.run(
@@ -33,9 +21,9 @@ def _lilypond_impl(ctx):
       direct=[ctx.file.src],
       transitive = [toolchain.lilypond.files]
     ),
-    outputs = outs,
+    outputs = ctx.outputs.outs,
   )
-  return [DefaultInfo(files = depset(outs))]
+  return [DefaultInfo(files = depset(ctx.outputs.outs))]
 
 
 _lilypond = rule(
@@ -43,6 +31,7 @@ _lilypond = rule(
     "src": attr.label(allow_single_file=[".ly"], mandatory = True),
     "png_out": attr.bool(default=True),
     "midi_out": attr.bool(default=True),
+    "outs": attr.output_list(),
   },
   toolchains = ["@bazel_lilypond//:lilypond_toolchain_type"],
   implementation = _lilypond_impl,
@@ -51,5 +40,10 @@ _lilypond = rule(
 def lilypond(**kwargs):
   if 'src' not in kwargs:
     kwargs['src'] = kwargs['name'] + ".ly"
+  kwargs['outs'] = []
+  if kwargs.get('png_out', True):
+    kwargs['outs'].append(paths.replace_extension(kwargs['src'], '.png'))
+  if kwargs.get('midi_out', True):
+    kwargs['outs'].append(paths.replace_extension(kwargs['src'], '.midi'))
   _lilypond(**kwargs)
 
